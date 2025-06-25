@@ -1,5 +1,6 @@
 // src/types.ts
 export interface Restaurant {
+  id: number;
   name: string;
   disabled: boolean;
   lastChosen: string | null;
