@@ -12,7 +12,7 @@ export const addRestaurant = async (restaurant: any) => {
   return res.data;
 };
 
-export const updateRestaurantApi = async (name: string, update: any) => {
+export const updateRestaurant = async (name: string, update: any) => {
   const res = await axios.put(`${API_URL}/${encodeURIComponent(name)}`, update);
   return res.data;
 };
