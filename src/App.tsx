@@ -10,6 +10,7 @@ import {
 } from "./api";
 
 function App() {
+  const DEFAULT_TAB = "Home";
   const [loggedIn, setLoggedIn] = useState(() => !!localStorage.getItem("mealdraw_token"));
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,6 +19,15 @@ function App() {
   const [drawnRestaurant, setDrawnRestaurant] = useState<Restaurant | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [drawHistory, setDrawHistory] = useState<{ name: string; timestamp: string }[]>([]);
+  const [showAddTabModal, setShowAddTabModal] = useState(false);
+  const [newTabName, setNewTabName] = useState("");
+
+  const [currentTab, setCurrentTab] = useState("Home");
+  const [tabs, setTabs] = useState<string[]>(() => {
+    const saved = localStorage.getItem("mealdraw_tabs");
+    const parsed = saved ? JSON.parse(saved) : [];
+    return parsed.includes("Home") ? parsed : ["Home", ...parsed];
+  });
 
   const token = localStorage.getItem("mealdraw_token");
   const username = localStorage.getItem("mealdraw_user");
@@ -26,6 +36,19 @@ function App() {
     if (!loggedIn) return;
     getRestaurants().then(setRestaurants).catch(console.error);
   }, [loggedIn]);
+
+  useEffect(() => {
+    const savedTabs = localStorage.getItem("mealdraw_tabs");
+    if (savedTabs) setTabs(JSON.parse(savedTabs));
+  }, []);
+  useEffect(() => {
+    setDrawnRestaurant(null); // ✅ clear the drawn result when tab changes
+  }, [currentTab]);
+
+  useEffect(() => {
+    localStorage.setItem("mealdraw_tabs", JSON.stringify(tabs));
+  }, [tabs]);
+
 
   if (!loggedIn) {
     return <LoginPage onLogin={() => setLoggedIn(true)} />;
@@ -72,11 +95,10 @@ function App() {
 
 
   const filteredRestaurants = restaurants.filter((r) => {
-    const matchesTags =
-      activeTags.length === 0 ||
-      (r.tags || []).some((tag) => activeTags.includes(tag));
+    const inTab = (r.tab || "Home") === currentTab;
+    const matchesTags = activeTags.length === 0 || (r.tags || []).some((tag) => activeTags.includes(tag));
     const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesTags && matchesSearch;
+    return inTab && matchesTags && matchesSearch;
   });
 
   const applyRestaurantUpdate = async (id: string, update: Partial<Restaurant>) => {
@@ -142,6 +164,7 @@ function App() {
       locationLink: locationLink || undefined,
       tags,
       drawHistory: [],
+      tab: currentTab,
     });
     setRestaurants(await getRestaurants());
     setShowModal(false);
@@ -250,6 +273,53 @@ function App() {
       </header>
 
       <main className="w-full max-w-3xl space-y-4">
+        <div className="flex flex-wrap gap-2 mb-4">
+          {tabs.map((tab) => (
+            <div key={tab} className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentTab(tab)}
+                className={`px-3 py-1 rounded-full text-sm border ${tab === currentTab
+                  ? "bg-blue-600 text-white border-blue-700"
+                  : "bg-white border-gray-300"
+                  }`}
+              >
+                {tab}
+              </button>
+
+              {tab !== DEFAULT_TAB && (
+                <button
+                  onClick={() => {
+                    if (!window.confirm(`Delete tab "${tab}"?`)) return;
+
+                    // Remove the tab
+                    setTabs((prev) => {
+                      const updated = prev.filter((t) => t !== tab);
+                      localStorage.setItem("mealdraw_tabs", JSON.stringify(updated));
+                      return updated;
+                    });
+
+                    // Remove restaurants in this tab
+                    setRestaurants((prev) => prev.filter((r) => r.tab !== tab));
+
+                    // Switch to default tab if you're deleting the current one
+                    if (tab === currentTab) setCurrentTab(DEFAULT_TAB);
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                  title={`Delete ${tab}`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button
+            onClick={() => setShowAddTabModal(true)}
+            className="px-3 py-1 rounded-full border bg-green-500 text-white text-sm"
+          >
+            + Add Tab
+          </button>
+        </div>
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <button
             className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -308,7 +378,13 @@ function App() {
         )}
 
         <div className="flex flex-wrap gap-2">
-          {Array.from(new Set(restaurants.flatMap(r => r.tags || []))).map(tag => (
+          {Array.from(
+            new Set(
+              restaurants
+                .filter((r) => (r.tab || DEFAULT_TAB) === currentTab)
+                .flatMap((r) => r.tags || [])
+            )
+          ).map((tag) => (
             <button
               key={tag}
               className={`px-2 py-1 rounded border ${activeTags.includes(tag) ? "bg-blue-600 text-white border-blue-700" : "bg-white border-gray-300"}`}
@@ -497,7 +573,57 @@ function App() {
         )
         }
 
+
       </main>
+      {showAddTabModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm">
+            <h2 className="text-lg font-bold mb-4">Add New Tab</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const name = newTabName.trim();
+                if (!name) return alert("Tab name is required.");
+                if (tabs.includes(name)) return alert("Tab already exists.");
+                const updated = [...tabs, name];
+                setTabs(updated);
+                localStorage.setItem("mealdraw_tabs", JSON.stringify(updated));
+                setCurrentTab(name);
+                setNewTabName("");
+                setShowAddTabModal(false);
+              }}
+              className="space-y-4"
+            >
+              <input
+                type="text"
+                value={newTabName}
+                onChange={(e) => setNewTabName(e.target.value)}
+                placeholder="e.g. Work, Family, Travel"
+                className="w-full border p-2 rounded"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTabName("");
+                    setShowAddTabModal(false);
+                  }}
+                  className="px-4 py-2 bg-gray-300 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded"
+                >
+                  Add Tab
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

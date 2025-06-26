@@ -9,4 +9,5 @@ export interface Restaurant {
   rating?: number;
   locationLink?: string;
   drawHistory?: string[]; 
+  tab?: string;
 }
