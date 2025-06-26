@@ -30,6 +30,46 @@ function App() {
   if (!loggedIn) {
     return <LoginPage onLogin={() => setLoggedIn(true)} />;
   }
+  const withStop = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+  const getFormattedNow = () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, "0");
+
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1);
+    const day = pad(now.getDate());
+    const hour = pad(now.getHours());
+    const minute = pad(now.getMinutes());
+    const second = pad(now.getSeconds());
+
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  };
+  const isChosenToday = (r: Restaurant) => {
+    const latest = r.drawHistory?.[r.drawHistory.length - 1];
+    if (!latest) return false;
+    const today = getFormattedNow();
+    return latest.startsWith(today);
+  };
+
+  const getRelativeTime = (dateStr: string) => {
+    const today = new Date();
+    const chosen = new Date(dateStr);
+    const diff = Math.floor((today.getTime() - chosen.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    return `${diff} days ago`;
+  };
+  const getRecencyColor = (dateStr: string | null) => {
+    if (!dateStr) return "text-gray-400";
+    const daysAgo = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysAgo <= 1) return "text-red-600";
+    if (daysAgo <= 3) return "text-yellow-600";
+    return "text-gray-500";
+  };
+
 
   const filteredRestaurants = restaurants.filter((r) => {
     const matchesTags =
@@ -39,8 +79,12 @@ function App() {
     return matchesTags && matchesSearch;
   });
 
-  const applyRestaurantUpdate = async (id: number, update: Partial<Restaurant>) => {
+  const applyRestaurantUpdate = async (id: string, update: Partial<Restaurant>) => {
     await updateRestaurant(id, update);
+    setRestaurants(await getRestaurants());
+  };
+  const reactivateRestaurant = async (id: string) => {
+    await applyRestaurantUpdate(id, { lastChosen: null });
     setRestaurants(await getRestaurants());
   };
 
@@ -97,14 +141,37 @@ function App() {
       lastChosen: null,
       locationLink: locationLink || undefined,
       tags,
+      drawHistory: [],
     });
     setRestaurants(await getRestaurants());
     setShowModal(false);
     form.reset();
   };
 
+  const handleEditSubmit = async (
+    e: React.FormEvent<HTMLFormElement>,
+    editingRestaurantId: string
+  ) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
+    const cooldown = parseInt((form.elements.namedItem("cooldown") as HTMLInputElement).value);
+    const locationLink = (form.elements.namedItem("locationLink") as HTMLInputElement).value.trim();
+    const tagsString = (form.elements.namedItem("tags") as HTMLInputElement).value;
+    const tags = tagsString.split(",").map(t => t.trim()).filter(Boolean);
+
+    await applyRestaurantUpdate(editingRestaurantId, {
+      name,
+      cooldownDays: isNaN(cooldown) ? 0 : cooldown,
+      locationLink,
+      tags,
+    });
+
+    setEditingRestaurant(null);
+  };
+
   const drawRestaurant = () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getFormattedNow();
     const eligible = filteredRestaurants.filter((r) => {
       if (r.disabled) return false;
       if (r.lastChosen && r.cooldownDays) {
@@ -122,8 +189,11 @@ function App() {
 
   const acceptRestaurant = async () => {
     if (!drawnRestaurant) return;
-    const today = new Date().toISOString().slice(0, 10);
-    await applyRestaurantUpdate(drawnRestaurant.id, { lastChosen: today });
+    const today = getFormattedNow();
+    await applyRestaurantUpdate(drawnRestaurant.id, {
+      lastChosen: today,
+      drawHistory: [...(drawnRestaurant.drawHistory || []), today],
+    });
     setDrawHistory((prev) => [
       { name: drawnRestaurant.name, timestamp: today },
       ...prev,
@@ -133,7 +203,7 @@ function App() {
 
   const markAsRecentlyChosen = async () => {
     if (!drawnRestaurant) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getFormattedNow();
     await applyRestaurantUpdate(drawnRestaurant.id, { lastChosen: today });
     setDrawHistory((prev) => [
       { name: drawnRestaurant.name, timestamp: today },
@@ -148,7 +218,7 @@ function App() {
     setDrawnRestaurant(null);
   };
 
-  const handleDeleteRestaurant = async (id: number) => {
+  const handleDeleteRestaurant = async (id: string) => {
     if (window.confirm(`Delete "${id}"?`)) {
       await deleteRestaurant(id);
       setRestaurants(await getRestaurants());
@@ -256,27 +326,51 @@ function App() {
           {filteredRestaurants.map((r) => (
             <li
               key={r.id}
-              className={`p-3 shadow rounded ${r.disabled ? "bg-gray-200 opacity-60" : "bg-white"}`}
+              onClick={() => setEditingRestaurant(r)}
+              className={`p-3 shadow rounded cursor-pointer transition hover:bg-blue-50 ${r.disabled ? "bg-gray-200 opacity-60" : "bg-white"}`}
             >
               <div className="flex justify-between items-center">
-                <div className="font-semibold text-base truncate max-w-[60%]">
-                  {r.name}
+                <div className="flex items-center gap-2 font-semibold text-base truncate max-w-[60%]">
+                  <span>{r.name}</span>
+                  {isChosenToday(r) && (
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-300">
+                      Chosen Today
+                    </span>
+                  )}
                 </div>
+                {(() => {
+                  const history = r.drawHistory;
+                  if (!history || history.length === 0) return null;
+
+                  const latest = history[history.length - 1];
+                  return (
+                    <div className={`text-xs mt-1 ${getRecencyColor(latest)}`}>
+                      Last chosen: {getRelativeTime(latest)}
+                    </div>
+                  );
+                })()}
+                {r.lastChosen && (() => {
+                  const today = new Date();
+                  const last = new Date(r.lastChosen);
+                  const diff = Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+                  return diff < (r.cooldownDays || 0);
+                })() && (
+                    <button
+                      onClick={withStop(() => reactivateRestaurant(r.id))}
+                      className="text-sm px-2 py-1 rounded bg-pink-500 text-white"
+                    >
+                      Reactivate
+                    </button>
+                  )}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => applyRestaurantUpdate(r.id, { disabled: !r.disabled })}
+                    onClick={withStop(() => applyRestaurantUpdate(r.id, { disabled: !r.disabled }))}
                     className={`text-sm px-2 py-1 rounded ${r.disabled ? "bg-green-500" : "bg-red-500"} text-white`}
                   >
                     {r.disabled ? "Enable" : "Disable"}
                   </button>
                   <button
-                    onClick={() => setEditingRestaurant(r)}
-                    className="text-sm px-2 py-1 rounded bg-yellow-500 text-white"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteRestaurant(r.id)}
+                    onClick={withStop(() => handleDeleteRestaurant(r.id))}
                     className="text-sm px-2 py-1 rounded bg-gray-600 text-white"
                   >
                     Delete
@@ -295,6 +389,20 @@ function App() {
             </li>
           ))}
         </ul>
+
+        {drawHistory.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-bold mb-2">Draw History</h2>
+            <ul className="space-y-1 text-sm text-gray-700">
+              {drawHistory.map((entry, i) => (
+                <li key={i} className="bg-white p-2 rounded shadow-sm flex justify-between">
+                  <span>{entry.name}</span>
+                  <span className="text-xs text-gray-500">{entry.timestamp}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -319,21 +427,7 @@ function App() {
             <div className="bg-white p-6 rounded-lg w-full max-w-md">
               <h2 className="text-xl font-bold mb-4">Edit: {editingRestaurant.name}</h2>
               <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.currentTarget;
-                  const cooldown = parseInt((form.elements.namedItem("cooldown") as HTMLInputElement).value);
-                  const locationLink = (form.elements.namedItem("locationLink") as HTMLInputElement).value.trim();
-                  const tagsString = (form.elements.namedItem("tags") as HTMLInputElement).value;
-                  const tags = tagsString.split(",").map(t => t.trim()).filter(Boolean);
-
-                  await applyRestaurantUpdate(editingRestaurant.id, {
-                    cooldownDays: isNaN(cooldown) ? 0 : cooldown,
-                    locationLink,
-                    tags,
-                  });
-                  setEditingRestaurant(null);
-                }}
+                onSubmit={(e) => handleEditSubmit(e, editingRestaurant.id)}
                 className="space-y-4"
               >
                 <input
@@ -379,9 +473,29 @@ function App() {
                   </button>
                 </div>
               </form>
+              {(() => {
+                const history = editingRestaurant.drawHistory;
+                if (!history || history.length === 0) return null;
+
+                const latest = history[history.length - 1];
+                return (
+                  <div className="mt-4 max-h-40 overflow-y-auto border-t pt-2 text-sm text-gray-700">
+                    <h3 className="font-semibold mb-1">Draw History</h3>
+                    <ul className="space-y-1">
+                      {history
+                        .slice()
+                        .reverse()
+                        .map((date, idx) => (
+                          <li key={idx}>{getRelativeTime(date)} ({date})</li>
+                        ))}
+                    </ul>
+                  </div>
+                );
+              })()}
             </div>
           </div>
-        )}
+        )
+        }
 
       </main>
     </div>

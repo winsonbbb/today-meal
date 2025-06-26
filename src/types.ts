@@ -1,11 +1,12 @@
 // src/types.ts
 export interface Restaurant {
-  id: number;
+  id: string;
   name: string;
   disabled: boolean;
   lastChosen: string | null;
   cooldownDays: number;
   tags?: string[];
   rating?: number;
-  locationLink?: string;   // NEW field for location URL
+  locationLink?: string;
+  drawHistory?: string[]; 
 }

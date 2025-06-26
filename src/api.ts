@@ -1,10 +1,11 @@
+// src/api.ts
 import axios from "axios";
 
 const API_URL = "http://localhost:4000/api/restaurants";
 const getToken = () => localStorage.getItem("mealdraw_token");
 
 const authHeader = () => ({
-  headers: { "X-Auth-Token": getToken() },
+  headers: { "X-Auth-Token": getToken() }
 });
 
 export const getRestaurants = async () => {
@@ -17,12 +18,12 @@ export const addRestaurant = async (restaurant: any) => {
   return res.data;
 };
 
-export const updateRestaurant = async (id: number, update: any) => {
-  const res = await axios.put(`${API_URL}/${encodeURIComponent(id)}`, update, authHeader());
+export const updateRestaurant = async (id: string, update: any) => {
+  const res = await axios.put(`${API_URL}/${id}`, update, authHeader());
   return res.data;
 };
 
-export const deleteRestaurant = async (id: number) => {
-  const res = await axios.delete(`${API_URL}/${encodeURIComponent(id)}`, authHeader());
+export const deleteRestaurant = async (id: string) => {
+  const res = await axios.delete(`${API_URL}/${id}`, authHeader());
   return res.data;
 };
