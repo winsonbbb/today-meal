@@ -41,7 +41,15 @@ if (typeof global.crypto === 'undefined') {
   if (!global.crypto.randomUUID) {
     (global.crypto as any).randomUUID = jest.fn(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
   } else {
-    jest.spyOn(global.crypto, 'randomUUID').mockImplementation(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
+    jest.spyOn(global.crypto, 'randomUUID').mockImplementation(() => {
+      // Ensure the return value matches `${string}-${string}-${string}-${string}-${string}`
+      const part1 = Math.random().toString(36).substring(2, 10);
+      const part2 = Math.random().toString(36).substring(2, 6);
+      const part3 = Math.random().toString(36).substring(2, 6);
+      const part4 = Math.random().toString(36).substring(2, 6);
+      const part5 = Math.random().toString(36).substring(2, 14);
+      return `${part1}-${part2}-${part3}-${part4}-${part5}`;
+    });
   }
 }
 
