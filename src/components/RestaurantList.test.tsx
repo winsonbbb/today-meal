@@ -34,8 +34,8 @@ describe('RestaurantList Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsChosenToday.mockReturnValue(false);
-    mockGetRecencyColor.mockReturnValue('text-gray-500');
-    mockGetRelativeTime.mockReturnValue('some time ago');
+    mockGetRecencyColor.mockImplementation((dateStr: string | null) => 'text-gray-500');
+    mockGetRelativeTime.mockImplementation((dateStr: string) => 'some time ago');
   });
 
   test('renders a list of RestaurantListItem components for each restaurant', () => {
