@@ -4,10 +4,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import EditRestaurantModal from './EditRestaurantModal';
 import { Restaurant } from '../types';
-import { jest } from '@jest/globals'; // Ensure this is present for jest.fn()
+// import { jest } from '@jest/globals'; // Removed
 
 // Corrected mock definition: Define type, assign jest.fn(), then implement in beforeEach
-const mockGetRelativeTime = jest.fn() as jest.MockedFunction<(dateStr: string) => string>;
+const mockGetRelativeTime = jest.fn<(dateStr: string) => string>();
 
 describe('EditRestaurantModal Component', () => {
   const mockOnClose = jest.fn();

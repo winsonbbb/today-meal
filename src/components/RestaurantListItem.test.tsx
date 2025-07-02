@@ -5,12 +5,12 @@ import '@testing-library/jest-dom';
 import RestaurantListItem from './RestaurantListItem';
 import { Restaurant } from '../types';
 
-import { jest } from '@jest/globals';
+// import { jest } from '@jest/globals'; // Removed, relying on tsconfig types for Jest globals
 
 // Mock helper functions that would normally come from App.tsx or a context
-const mockIsChosenToday = jest.fn() as jest.MockedFunction<(r: Restaurant) => boolean>;
-const mockGetRecencyColor = jest.fn() as jest.MockedFunction<(dateStr: string | null) => string>;
-const mockGetRelativeTime = jest.fn() as jest.MockedFunction<(dateStr: string) => string>;
+const mockIsChosenToday = jest.fn<(r: Restaurant) => boolean>();
+const mockGetRecencyColor = jest.fn<(dateStr: string | null) => string>();
+const mockGetRelativeTime = jest.fn<(dateStr: string) => string>();
 
 describe('RestaurantListItem Component', () => {
   const mockOnEdit = jest.fn();

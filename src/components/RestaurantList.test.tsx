@@ -4,12 +4,12 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import RestaurantList from './RestaurantList';
 import { Restaurant } from '../types';
-import { jest } from '@jest/globals'; // Already present, ensuring it's noted
+// import { jest } from '@jest/globals'; // Removed
 
 // Mocks for props that would normally come from App.tsx or a context
-const mockIsChosenToday = jest.fn() as jest.MockedFunction<(r: Restaurant) => boolean>;
-const mockGetRecencyColor = jest.fn() as jest.MockedFunction<(dateStr: string | null) => string>;
-const mockGetRelativeTime = jest.fn() as jest.MockedFunction<(dateStr: string) => string>;
+const mockIsChosenToday = jest.fn<(r: Restaurant) => boolean>();
+const mockGetRecencyColor = jest.fn<(dateStr: string | null) => string>();
+const mockGetRelativeTime = jest.fn<(dateStr: string) => string>();
 const mockOnEditRestaurant = jest.fn();
 const mockOnToggleRestaurantDisable = jest.fn();
 const mockOnDeleteRestaurant = jest.fn();

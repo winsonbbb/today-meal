@@ -1,15 +1,16 @@
 // src/components/RestaurantWheel.test.tsx
 import React from 'react';
-import { render, screen, act, waitFor } from '@testing-library/react'; // Added waitFor
+import { render, screen, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import RestaurantWheel from './RestaurantWheel';
 import { Restaurant } from '../types';
 
 // Setup fake timers
+// import { jest } from '@jest/globals'; // Removed
 jest.useFakeTimers();
 
 describe('RestaurantWheel Component', () => {
-  const mockOnSpinComplete = jest.fn() as jest.MockedFunction<(selectedRestaurant: Restaurant) => void>;
+  const mockOnSpinComplete = jest.fn<(selectedRestaurant: Restaurant) => void>();
   const sampleRestaurants: Restaurant[] = [
     { id: '1', name: 'Restaurant A', cooldownDays: 0, disabled: false, lastChosen: null, tags: [], drawHistory: [], tab: 'Home' },
     { id: '2', name: 'Restaurant B', cooldownDays: 0, disabled: false, lastChosen: null, tags: [], drawHistory: [], tab: 'Home' },

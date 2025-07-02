@@ -1,7 +1,7 @@
 // src/App.test.tsx
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { jest } from '@jest/globals'; // Re-adding for explicit Jest global access
+// import { jest } from '@jest/globals'; // Removed, relying on tsconfig types for Jest globals
 import '@testing-library/jest-dom';
 import App from './App';
 import * as api from './api'; // To mock API calls
