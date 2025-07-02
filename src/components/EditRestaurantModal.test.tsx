@@ -7,7 +7,7 @@ import { Restaurant } from '../types';
 // import { jest } from '@jest/globals'; // Removed
 
 // Corrected mock definition: Define type, assign jest.fn(), then implement in beforeEach
-const mockGetRelativeTime = jest.fn<(dateStr: string) => string>();
+const mockGetRelativeTime = jest.fn() as jest.Mock<(dateStr: string) => string>;
 
 describe('EditRestaurantModal Component', () => {
   const mockOnClose = jest.fn();
@@ -31,7 +31,7 @@ describe('EditRestaurantModal Component', () => {
     mockOnSubmit.mockClear();
     mockGetRelativeTime.mockClear(); // Clear any previous mocks or calls
     // Set implementation in beforeEach
-    mockGetRelativeTime.mockImplementation((dateStr: string) => {
+    mockGetRelativeTime.mockImplementation(() => (dateStr: string) => {
       if (!dateStr) return '';
       // Basic relative time for testing, e.g., "X days ago" or "Today"
       const date = new Date(dateStr);
@@ -50,7 +50,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={null}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
     expect(container.firstChild).toBeNull();
@@ -62,7 +62,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={sampleRestaurant}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
 
@@ -82,7 +82,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={sampleRestaurant}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
@@ -95,7 +95,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={sampleRestaurant}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
 
@@ -112,7 +112,7 @@ describe('EditRestaurantModal Component', () => {
 
   test('displays draw history for the restaurant', () => {
     // Ensure the mock provides distinct values for different dates if component logic depends on it
-    mockGetRelativeTime.mockImplementation((dateStr: string) => {
+    mockGetRelativeTime.mockImplementation(() => (dateStr: string) => {
         if (dateStr === '2023-10-01T12:00:00.000Z') return 'Last month'; // Example
         if (dateStr === '2023-09-01T12:00:00.000Z') return 'Two months ago';
         return 'A while ago';
@@ -123,7 +123,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={sampleRestaurant}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
 
@@ -133,8 +133,8 @@ describe('EditRestaurantModal Component', () => {
 
     displayedHistory.forEach(historyDate => {
       expect(mockGetRelativeTime).toHaveBeenCalledWith(historyDate);
-      const expectedRelativeTime = mockGetRelativeTime(historyDate); // Get what the mock would return
-      const expectedTextPattern = new RegExp(`${expectedRelativeTime.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\(${historyDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`);
+      const relativeTimeString = (mockGetRelativeTime as unknown as (dateStr: string) => string)(historyDate); // Get what the mock would return
+      const expectedTextPattern = new RegExp(`${relativeTimeString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\(${historyDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`);
       expect(screen.getByText(expectedTextPattern)).toBeInTheDocument();
     });
     expect(mockGetRelativeTime).toHaveBeenCalledTimes(sampleRestaurant.drawHistory!.length * 2); // Called once per historyDate in loop, once in mockGetRelativeTime(historyDate) for RegExp
@@ -147,7 +147,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={restaurantWithoutHistory}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
     expect(screen.queryByText('Draw History')).not.toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('EditRestaurantModal Component', () => {
         editingRestaurant={restaurantWithNullHistory}
         onClose={mockOnClose}
         onSubmit={mockOnSubmit}
-        getRelativeTime={mockGetRelativeTime}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
       />
     );
     expect(screen.queryByText('Draw History')).not.toBeInTheDocument();

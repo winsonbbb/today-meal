@@ -32,7 +32,7 @@ const RestaurantWheel: React.FC<RestaurantWheelProps> = ({
       const targetAngle = 360 * 5 - randomIndex * segmentAngle + segmentAngle / 2;
 
       if (wheelRef.current) {
-        wheelRef.current.style.transition = 'transform 4s ease-out';
+        wheelRef.current.style.transition = 'transform 2s ease-out';
         wheelRef.current.style.transform = `rotate(${targetAngle}deg)`;
       }
 
@@ -44,7 +44,7 @@ const RestaurantWheel: React.FC<RestaurantWheelProps> = ({
           wheelRef.current.style.transform = `rotate(${finalAngle}deg)`;
         }
         setIsInternallySpinning(false); // Reset internal spinning state
-      }, 4000);
+      }, 1000);
     } else if (!triggerSpin && isInternallySpinning) {
       // If triggerSpin becomes false while internally spinning (e.g. parent component reset it),
       // we might want to ensure the internal state is also reset, though App.tsx handles this.
@@ -75,7 +75,7 @@ const RestaurantWheel: React.FC<RestaurantWheelProps> = ({
           className="absolute w-full h-full rounded-full"
           style={{
             transformOrigin: 'center center',
-            transition: 'transform 4s ease-out',
+            transition: 'transform 2s ease-out',
           }}
         >
           {restaurants.map((restaurant, index) => {

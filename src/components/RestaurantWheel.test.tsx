@@ -10,7 +10,7 @@ import { Restaurant } from '../types';
 jest.useFakeTimers();
 
 describe('RestaurantWheel Component', () => {
-  const mockOnSpinComplete = jest.fn<(selectedRestaurant: Restaurant) => void>();
+  const mockOnSpinComplete: jest.Mock<(selectedRestaurant: Restaurant) => void> = jest.fn();
   const sampleRestaurants: Restaurant[] = [
     { id: '1', name: 'Restaurant A', cooldownDays: 0, disabled: false, lastChosen: null, tags: [], drawHistory: [], tab: 'Home' },
     { id: '2', name: 'Restaurant B', cooldownDays: 0, disabled: false, lastChosen: null, tags: [], drawHistory: [], tab: 'Home' },

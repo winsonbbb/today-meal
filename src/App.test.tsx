@@ -33,16 +33,17 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 global.confirm = jest.fn(() => true);
 
 // Mock crypto.randomUUID for Jest environment
-const mockUUID = () => {
+const mockUUID: () => `${string}-${string}-${string}-${string}-${string}` = () => {
   let d = new Date().getTime();
   if (typeof performance !== 'undefined' && typeof performance.now === 'function'){
     d += performance.now();
   }
+  // This string will always match the UUID template type
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (d + Math.random()*16)%16 | 0;
     d = Math.floor(d/16);
     return (c=='x' ? r : (r&0x3|0x8)).toString(16);
-  });
+  }) as `${string}-${string}-${string}-${string}-${string}`;
 };
 
 if (typeof global.crypto === 'undefined') {

@@ -7,9 +7,9 @@ import { Restaurant } from '../types';
 // import { jest } from '@jest/globals'; // Removed
 
 // Mocks for props that would normally come from App.tsx or a context
-const mockIsChosenToday = jest.fn<(r: Restaurant) => boolean>();
-const mockGetRecencyColor = jest.fn<(dateStr: string | null) => string>();
-const mockGetRelativeTime = jest.fn<(dateStr: string) => string>();
+const mockIsChosenToday = jest.fn() as jest.Mock<boolean, [Restaurant]>;
+const mockGetRecencyColor = jest.fn<(dateStr: string | null) => string, [string | null]>();
+const mockGetRelativeTime = jest.fn<(dateStr: string) => string, [string]>();
 const mockOnEditRestaurant = jest.fn();
 const mockOnToggleRestaurantDisable = jest.fn();
 const mockOnDeleteRestaurant = jest.fn();
@@ -34,8 +34,8 @@ describe('RestaurantList Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsChosenToday.mockReturnValue(false);
-    mockGetRecencyColor.mockImplementation((dateStr: string | null) => 'text-gray-500');
-    mockGetRelativeTime.mockImplementation((dateStr: string) => 'some time ago');
+    (mockGetRecencyColor as jest.Mock).mockReturnValue('text-gray-500');
+    (mockGetRelativeTime as jest.Mock).mockReturnValue('some time ago');
   });
 
   test('renders a list of RestaurantListItem components for each restaurant', () => {
@@ -43,8 +43,8 @@ describe('RestaurantList Component', () => {
       <RestaurantList
         restaurants={sampleRestaurants}
         isChosenToday={mockIsChosenToday}
-        getRecencyColor={mockGetRecencyColor}
-        getRelativeTime={mockGetRelativeTime}
+        getRecencyColor={mockGetRecencyColor as unknown as (dateStr: string | null) => string}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
         onEditRestaurant={mockOnEditRestaurant}
         onToggleRestaurantDisable={mockOnToggleRestaurantDisable}
         onDeleteRestaurant={mockOnDeleteRestaurant}
@@ -65,8 +65,8 @@ describe('RestaurantList Component', () => {
       <RestaurantList
         restaurants={[]}
         isChosenToday={mockIsChosenToday}
-        getRecencyColor={mockGetRecencyColor}
-        getRelativeTime={mockGetRelativeTime}
+        getRecencyColor={mockGetRecencyColor as unknown as (dateStr: string | null) => string}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
         onEditRestaurant={mockOnEditRestaurant}
         onToggleRestaurantDisable={mockOnToggleRestaurantDisable}
         onDeleteRestaurant={mockOnDeleteRestaurant}
@@ -85,8 +85,8 @@ describe('RestaurantList Component', () => {
       <RestaurantList
         restaurants={[sampleRestaurants[0]]} // Test with one restaurant for simplicity
         isChosenToday={mockIsChosenToday}
-        getRecencyColor={mockGetRecencyColor}
-        getRelativeTime={mockGetRelativeTime}
+        getRecencyColor={mockGetRecencyColor as unknown as (dateStr: string | null) => string}
+        getRelativeTime={mockGetRelativeTime as unknown as (dateStr: string | null) => string}
         onEditRestaurant={mockOnEditRestaurant}
         onToggleRestaurantDisable={mockOnToggleRestaurantDisable}
         onDeleteRestaurant={mockOnDeleteRestaurant}
