@@ -33,16 +33,30 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 global.confirm = jest.fn(() => true);
 
 // Mock crypto.randomUUID for Jest environment
+const mockUUID = () => {
+  let d = new Date().getTime();
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function'){
+    d += performance.now();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (d + Math.random()*16)%16 | 0;
+    d = Math.floor(d/16);
+    return (c=='x' ? r : (r&0x3|0x8)).toString(16);
+  });
+};
+
 if (typeof global.crypto === 'undefined') {
   (global as any).crypto = {
-    randomUUID: jest.fn(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`),
+    randomUUID: jest.fn(mockUUID),
   };
 } else {
-  // If global.crypto exists but randomUUID doesn't (e.g. older Node version in some test envs)
   if (!global.crypto.randomUUID) {
-    (global.crypto as any).randomUUID = jest.fn(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
+    (global.crypto as any).randomUUID = jest.fn(mockUUID);
   } else {
-    jest.spyOn(global.crypto, 'randomUUID').mockImplementation(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
+    // It's important to ensure this spy is effective.
+    // If jest.spyOn was already called, this re-mocks its implementation.
+    // If it wasn't, this will spy and mock.
+    jest.spyOn(global.crypto, 'randomUUID').mockImplementation(mockUUID);
   }
 }
 
