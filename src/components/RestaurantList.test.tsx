@@ -4,11 +4,12 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import RestaurantList from './RestaurantList';
 import { Restaurant } from '../types';
+import { jest } from '@jest/globals';
 
 // Mocks for props that would normally come from App.tsx or a context
-const mockIsChosenToday = jest.fn();
-const mockGetRecencyColor = jest.fn(() => 'text-gray-500');
-const mockGetRelativeTime = jest.fn(() => 'some time ago');
+const mockIsChosenToday: jest.Mock<(r: Restaurant) => boolean> = jest.fn();
+const mockGetRecencyColor: jest.Mock<(dateStr: string | null) => string> = jest.fn();
+const mockGetRelativeTime: jest.Mock<(dateStr: string) => string> = jest.fn();
 const mockOnEditRestaurant = jest.fn();
 const mockOnToggleRestaurantDisable = jest.fn();
 const mockOnDeleteRestaurant = jest.fn();
@@ -32,6 +33,9 @@ describe('RestaurantList Component', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsChosenToday.mockReturnValue(false);
+    mockGetRecencyColor.mockReturnValue('text-gray-500');
+    mockGetRelativeTime.mockReturnValue('some time ago');
   });
 
   test('renders a list of RestaurantListItem components for each restaurant', () => {

@@ -7,12 +7,4 @@ module.exports = {
     extend: {},
   },
   plugins: [],
-  compilerOptions: {
-    // ...existing code...
-    types: ["jest", "node"]
-  },
-  include: [
-    "src"
-  ]
-
 }

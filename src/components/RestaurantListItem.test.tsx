@@ -5,10 +5,12 @@ import '@testing-library/jest-dom';
 import RestaurantListItem from './RestaurantListItem';
 import { Restaurant } from '../types';
 
+import { jest } from '@jest/globals'; // Ensure this is present
+
 // Mock helper functions that would normally come from App.tsx or a context
 const mockIsChosenToday = jest.fn();
 const mockGetRecencyColor = jest.fn(() => 'text-gray-500'); // Default color
-const mockGetRelativeTime = jest.fn(() => '5 days ago');
+const mockGetRelativeTime: jest.Mock<(dateStr: string) => string> = jest.fn();
 
 describe('RestaurantListItem Component', () => {
   const mockOnEdit = jest.fn();
@@ -31,7 +33,8 @@ describe('RestaurantListItem Component', () => {
     jest.clearAllMocks();
     // Default mock implementations
     mockIsChosenToday.mockReturnValue(false);
-    mockGetRelativeTime.mockImplementation((dateStr) => {
+    mockGetRecencyColor.mockReturnValue('text-gray-500'); // Ensure this is also reset if needed
+    mockGetRelativeTime.mockImplementation((dateStr: string) => { // Explicitly type dateStr
       if (!dateStr) return '';
       // Simple mock, doesn't need to be super accurate for these tests
       const date = new Date(dateStr);

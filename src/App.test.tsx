@@ -1,6 +1,7 @@
 // src/App.test.tsx
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { jest } from '@jest/globals'; // Explicit import for Jest's global object
 import '@testing-library/jest-dom';
 import App from './App';
 import * as api from './api'; // To mock API calls
@@ -41,15 +42,7 @@ if (typeof global.crypto === 'undefined') {
   if (!global.crypto.randomUUID) {
     (global.crypto as any).randomUUID = jest.fn(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
   } else {
-    jest.spyOn(global.crypto, 'randomUUID').mockImplementation(() => {
-      // Ensure the return value matches `${string}-${string}-${string}-${string}-${string}`
-      const part1 = Math.random().toString(36).substring(2, 10);
-      const part2 = Math.random().toString(36).substring(2, 6);
-      const part3 = Math.random().toString(36).substring(2, 6);
-      const part4 = Math.random().toString(36).substring(2, 6);
-      const part5 = Math.random().toString(36).substring(2, 14);
-      return `${part1}-${part2}-${part3}-${part4}-${part5}`;
-    });
+    jest.spyOn(global.crypto, 'randomUUID').mockImplementation(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
   }
 }
 
