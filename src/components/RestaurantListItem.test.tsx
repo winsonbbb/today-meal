@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import RestaurantListItem from './RestaurantListItem';
 import { Restaurant } from '../types';
 
-import { jest } from '@jest/globals'; // Ensure this is present
+import { jest } from '@jest/globals';
 
 // Mock helper functions that would normally come from App.tsx or a context
 const mockIsChosenToday = jest.fn();

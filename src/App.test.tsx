@@ -1,7 +1,7 @@
 // src/App.test.tsx
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { jest } from '@jest/globals'; // Explicit import for Jest's global object
+import { jest } from '@jest/globals'; // Re-adding for explicit Jest global access
 import '@testing-library/jest-dom';
 import App from './App';
 import * as api from './api'; // To mock API calls
@@ -80,8 +80,8 @@ describe('App Component Integration Tests', () => {
 
     // Default API mock implementations
     mockedApi.getRestaurants.mockResolvedValue([...mockRestaurants].map(r => ({...r}))); // Return a deep copy
-    mockedApi.addRestaurant.mockImplementation(async (restaurant) => ({ ...restaurant, id: crypto.randomUUID() })); // Use mocked crypto
-    mockedApi.updateRestaurant.mockImplementation(async (id, update) => {
+    mockedApi.addRestaurant.mockImplementation(async (restaurant: Omit<Restaurant, 'id'>) => ({ ...restaurant, id: crypto.randomUUID() } as Restaurant)); // Use mocked crypto
+    mockedApi.updateRestaurant.mockImplementation(async (id: string, update: Partial<Restaurant>) => {
         const existingIndex = mockRestaurants.findIndex(r => r.id === id);
         // Simulate a successful update from a backend
         const updatedRestaurant = { ...mockRestaurants[existingIndex], ...update, id };

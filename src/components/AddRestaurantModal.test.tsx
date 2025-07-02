@@ -1,6 +1,7 @@
 // src/components/AddRestaurantModal.test.tsx
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { jest } from '@jest/globals';
 import '@testing-library/jest-dom';
 import AddRestaurantModal from './AddRestaurantModal';
 

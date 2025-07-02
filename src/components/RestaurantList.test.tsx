@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import RestaurantList from './RestaurantList';
 import { Restaurant } from '../types';
-import { jest } from '@jest/globals';
+import { jest } from '@jest/globals'; // Already present, ensuring it's noted
 
 // Mocks for props that would normally come from App.tsx or a context
 const mockIsChosenToday: jest.Mock<(r: Restaurant) => boolean> = jest.fn();
