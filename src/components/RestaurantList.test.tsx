@@ -7,9 +7,9 @@ import { Restaurant } from '../types';
 import { jest } from '@jest/globals'; // Already present, ensuring it's noted
 
 // Mocks for props that would normally come from App.tsx or a context
-const mockIsChosenToday: jest.Mock<(r: Restaurant) => boolean> = jest.fn();
-const mockGetRecencyColor: jest.Mock<(dateStr: string | null) => string> = jest.fn();
-const mockGetRelativeTime: jest.Mock<(dateStr: string) => string> = jest.fn();
+const mockIsChosenToday = jest.fn() as jest.MockedFunction<(r: Restaurant) => boolean>;
+const mockGetRecencyColor = jest.fn() as jest.MockedFunction<(dateStr: string | null) => string>;
+const mockGetRelativeTime = jest.fn() as jest.MockedFunction<(dateStr: string) => string>;
 const mockOnEditRestaurant = jest.fn();
 const mockOnToggleRestaurantDisable = jest.fn();
 const mockOnDeleteRestaurant = jest.fn();

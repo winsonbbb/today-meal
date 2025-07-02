@@ -8,9 +8,9 @@ import { Restaurant } from '../types';
 import { jest } from '@jest/globals';
 
 // Mock helper functions that would normally come from App.tsx or a context
-const mockIsChosenToday = jest.fn();
-const mockGetRecencyColor = jest.fn(() => 'text-gray-500'); // Default color
-const mockGetRelativeTime: jest.Mock<(dateStr: string) => string> = jest.fn();
+const mockIsChosenToday = jest.fn() as jest.MockedFunction<(r: Restaurant) => boolean>;
+const mockGetRecencyColor = jest.fn() as jest.MockedFunction<(dateStr: string | null) => string>;
+const mockGetRelativeTime = jest.fn() as jest.MockedFunction<(dateStr: string) => string>;
 
 describe('RestaurantListItem Component', () => {
   const mockOnEdit = jest.fn();
