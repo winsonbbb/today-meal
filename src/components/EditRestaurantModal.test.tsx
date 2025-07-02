@@ -4,19 +4,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import EditRestaurantModal from './EditRestaurantModal';
 import { Restaurant } from '../types';
+import { jest } from '@jest/globals'; // Ensure this is present for jest.fn()
 
-// Mock helper function that would normally come from App.tsx
-const mockGetRelativeTime = jest.fn((dateStr: string) => `${dateStr} relative`);
+// Corrected mock definition: Define type, assign jest.fn(), then implement in beforeEach
+const mockGetRelativeTime = jest.fn() as jest.MockedFunction<(dateStr: string) => string>;
 
 describe('EditRestaurantModal Component', () => {
   const mockOnClose = jest.fn();
   const mockOnSubmit = jest.fn();
-
-  beforeEach(() => {
-    mockOnClose.mockClear();
-    mockOnSubmit.mockClear();
-    mockGetRelativeTime.mockImplementation((dateStr: string) => `${dateStr} relative`);
-  });
 
   const sampleRestaurant: Restaurant = {
     id: 'r1',
@@ -25,15 +20,28 @@ describe('EditRestaurantModal Component', () => {
     disabled: false,
     lastChosen: '2023-10-01T12:00:00.000Z',
     tags: ['tag1', 'tag2'],
-    drawHistory: ['2023-10-01T12:00:00.000Z', '2023-09-01T12:00:00.000Z'],
+    drawHistory: ['2023-10-01T12:00:00.000Z', '2023-09-01T12:00:00.000Z'].sort((a,b) => new Date(b).getTime() - new Date(a).getTime()), //Ensure descending for slice().reverse() in component
     tab: 'Home',
     locationLink: 'http://original.link',
   };
 
+  // Single beforeEach for all mock setups and clears
   beforeEach(() => {
     mockOnClose.mockClear();
     mockOnSubmit.mockClear();
-    mockGetRelativeTime.mockClear();
+    mockGetRelativeTime.mockClear(); // Clear any previous mocks or calls
+    // Set implementation in beforeEach
+    mockGetRelativeTime.mockImplementation((dateStr: string) => {
+      if (!dateStr) return '';
+      // Basic relative time for testing, e.g., "X days ago" or "Today"
+      const date = new Date(dateStr);
+      const today = new Date();
+      const diffTime = Math.abs(today.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays === 0 && today.getDate() === date.getDate()) return "Today";
+      if (diffDays === 1 && today.getDate() !== date.getDate() ) return "Yesterday"; // crude
+      return `${diffDays} days ago`;
+    });
   });
 
   test('does not render when editingRestaurant is null', () => {
@@ -96,18 +104,20 @@ describe('EditRestaurantModal Component', () => {
     fireEvent.change(nameInput, { target: { value: newName } });
 
     const formElement = screen.getByTestId('edit-restaurant-form');
-    fireEvent.submit(formElement); // Or click Save button
+    fireEvent.submit(formElement);
 
     expect(mockOnSubmit).toHaveBeenCalledTimes(1);
     expect(mockOnSubmit).toHaveBeenCalledWith(expect.anything(), sampleRestaurant.id);
-    // expect.anything() for the event object.
-    // More detailed form data checking (e.g. ensuring newName is part of the event)
-    // would typically be part of an integration test or by directly inspecting form elements
-    // if the onSubmit handler in the component extracted them before passing up.
-    // For this component, it passes the event up, so App.tsx's handler is responsible for extraction.
   });
 
   test('displays draw history for the restaurant', () => {
+    // Ensure the mock provides distinct values for different dates if component logic depends on it
+    mockGetRelativeTime.mockImplementation((dateStr: string) => {
+        if (dateStr === '2023-10-01T12:00:00.000Z') return 'Last month'; // Example
+        if (dateStr === '2023-09-01T12:00:00.000Z') return 'Two months ago';
+        return 'A while ago';
+    });
+
     render(
       <EditRestaurantModal
         editingRestaurant={sampleRestaurant}
@@ -118,16 +128,16 @@ describe('EditRestaurantModal Component', () => {
     );
 
     expect(screen.getByText('Draw History')).toBeInTheDocument();
-    sampleRestaurant.drawHistory!.forEach(historyDate => {
-      // Check if getRelativeTime was called for each history entry
+    // The component sorts history (slice().reverse()), so '2023-10-01...' appears first in display
+    const displayedHistory = [...sampleRestaurant.drawHistory!].reverse();
+
+    displayedHistory.forEach(historyDate => {
       expect(mockGetRelativeTime).toHaveBeenCalledWith(historyDate);
-      // The component renders: <li>{getRelativeTime(date)} ({date})</li>
-      // The mock returns: `${dateStr} relative`
-      // So the text becomes: `${historyDate} relative (${historyDate})`
-      const expectedTextPattern = new RegExp(`${historyDate} relative.*\\(${historyDate}\\)`);
+      const expectedRelativeTime = mockGetRelativeTime(historyDate); // Get what the mock would return
+      const expectedTextPattern = new RegExp(`${expectedRelativeTime.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\(${historyDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`);
       expect(screen.getByText(expectedTextPattern)).toBeInTheDocument();
     });
-     expect(mockGetRelativeTime).toHaveBeenCalledTimes(sampleRestaurant.drawHistory!.length);
+    expect(mockGetRelativeTime).toHaveBeenCalledTimes(sampleRestaurant.drawHistory!.length * 2); // Called once per historyDate in loop, once in mockGetRelativeTime(historyDate) for RegExp
   });
 
   test('does not display draw history if not available', () => {
