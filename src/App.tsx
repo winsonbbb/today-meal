@@ -8,6 +8,14 @@ import {
   updateRestaurant,
   deleteRestaurant,
 } from "./api";
+import Header from "./components/Header";
+import AddRestaurantModal from "./components/AddRestaurantModal";
+import EditRestaurantModal from "./components/EditRestaurantModal";
+import Tabs from "./components/Tabs";
+import DrawResult from "./components/DrawResult";
+import RestaurantList from "./components/RestaurantList";
+import DrawHistory from "./components/DrawHistory";
+import RestaurantWheel from "./components/RestaurantWheel"; // Import the wheel
 
 function App() {
   const DEFAULT_TAB = "Home";
@@ -17,19 +25,20 @@ function App() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(null);
   const [drawnRestaurant, setDrawnRestaurant] = useState<Restaurant | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [drawHistory, setDrawHistory] = useState<{ name: string; timestamp: string }[]>([]);
+  const [showAddRestaurantModal, setShowAddRestaurantModal] = useState(false);
+  const [drawHistoryState, setDrawHistoryState] = useState<{ name: string; timestamp: string }[]>([]);
   const [showAddTabModal, setShowAddTabModal] = useState(false);
+  const [isWheelSpinning, setIsWheelSpinning] = useState(false);
+  const [triggerWheelSpin, setTriggerWheelSpin] = useState(false);
   const [newTabName, setNewTabName] = useState("");
 
   const [currentTab, setCurrentTab] = useState("Home");
-  const [tabs, setTabs] = useState<string[]>(() => {
+  const [tabsState, setTabsState] = useState<string[]>(() => {
     const saved = localStorage.getItem("mealdraw_tabs");
     const parsed = saved ? JSON.parse(saved) : [];
     return parsed.includes("Home") ? parsed : ["Home", ...parsed];
   });
 
-  const token = localStorage.getItem("mealdraw_token");
   const username = localStorage.getItem("mealdraw_user");
 
   useEffect(() => {
@@ -39,37 +48,34 @@ function App() {
 
   useEffect(() => {
     const savedTabs = localStorage.getItem("mealdraw_tabs");
-    if (savedTabs) setTabs(JSON.parse(savedTabs));
+    if (savedTabs) setTabsState(JSON.parse(savedTabs));
   }, []);
+
   useEffect(() => {
-    setDrawnRestaurant(null); // ✅ clear the drawn result when tab changes
+    setDrawnRestaurant(null); // Clear the drawn result when tab changes
   }, [currentTab]);
 
   useEffect(() => {
-    localStorage.setItem("mealdraw_tabs", JSON.stringify(tabs));
-  }, [tabs]);
+    localStorage.setItem("mealdraw_tabs", JSON.stringify(tabsState));
+  }, [tabsState]);
 
 
   if (!loggedIn) {
     return <LoginPage onLogin={() => setLoggedIn(true)} />;
   }
-  const withStop = (fn: () => void) => (e: React.MouseEvent) => {
-    e.stopPropagation();
-    fn();
-  };
+
   const getFormattedNow = () => {
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, "0");
-
     const year = now.getFullYear();
     const month = pad(now.getMonth() + 1);
     const day = pad(now.getDate());
     const hour = pad(now.getHours());
     const minute = pad(now.getMinutes());
     const second = pad(now.getSeconds());
-
     return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
   };
+
   const isChosenToday = (r: Restaurant) => {
     const latest = r.drawHistory?.[r.drawHistory.length - 1];
     if (!latest) return false;
@@ -85,6 +91,7 @@ function App() {
     if (diff === 1) return "Yesterday";
     return `${diff} days ago`;
   };
+
   const getRecencyColor = (dateStr: string | null) => {
     if (!dateStr) return "text-gray-400";
     const daysAgo = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
@@ -93,19 +100,36 @@ function App() {
     return "text-gray-500";
   };
 
+  const eligibleRestaurants = restaurants.filter((r) => {
+    const inTab = (r.tab || "Home") === currentTab;
+    const matchesTags = activeTags.length === 0 || (r.tags || []).some((tag) => activeTags.includes(tag));
+    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const filteredRestaurants = restaurants.filter((r) => {
+    if (!inTab || !matchesTags || !matchesSearch || r.disabled) return false;
+
+    if (r.lastChosen && r.cooldownDays) {
+      const lastDate = new Date(r.lastChosen);
+      const cooldownOver = new Date(lastDate);
+      cooldownOver.setDate(lastDate.getDate() + Number(r.cooldownDays));
+      return new Date() >= cooldownOver;
+    }
+    return true;
+  });
+
+  const filteredRestaurantsForList = restaurants.filter((r) => {
     const inTab = (r.tab || "Home") === currentTab;
     const matchesTags = activeTags.length === 0 || (r.tags || []).some((tag) => activeTags.includes(tag));
     const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase());
     return inTab && matchesTags && matchesSearch;
   });
 
+
   const applyRestaurantUpdate = async (id: string, update: Partial<Restaurant>) => {
     await updateRestaurant(id, update);
     setRestaurants(await getRestaurants());
   };
-  const reactivateRestaurant = async (id: string) => {
+
+  const reactivateRestaurantHandler = async (id: string) => {
     await applyRestaurantUpdate(id, { lastChosen: null });
     setRestaurants(await getRestaurants());
   };
@@ -144,7 +168,7 @@ function App() {
     reader.readAsText(file);
   };
 
-  const handleAddRestaurant = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddRestaurantSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
@@ -156,7 +180,7 @@ function App() {
     if (restaurants.some(r => r.name === name)) return alert("This restaurant already exists.");
 
     await addRestaurant({
-      id: crypto.randomUUID(), // ✅ new
+      id: crypto.randomUUID(),
       name,
       cooldownDays: isNaN(cooldown) ? 0 : cooldown,
       disabled: false,
@@ -167,11 +191,11 @@ function App() {
       tab: currentTab,
     });
     setRestaurants(await getRestaurants());
-    setShowModal(false);
+    setShowAddRestaurantModal(false);
     form.reset();
   };
 
-  const handleEditSubmit = async (
+  const handleEditRestaurantSubmit = async (
     e: React.FormEvent<HTMLFormElement>,
     editingRestaurantId: string
   ) => {
@@ -193,149 +217,181 @@ function App() {
     setEditingRestaurant(null);
   };
 
-  const drawRestaurant = () => {
-    const today = getFormattedNow();
-    const eligible = filteredRestaurants.filter((r) => {
-      if (r.disabled) return false;
-      if (r.lastChosen && r.cooldownDays) {
-        const lastDate = new Date(r.lastChosen);
-        const cooldownOver = new Date(lastDate);
-        cooldownOver.setDate(lastDate.getDate() + r.cooldownDays);
-        return new Date(today) >= cooldownOver;
-      }
-      return true;
-    });
-    if (eligible.length === 0) return alert("No restaurants available to draw.");
-    const pick = eligible[Math.floor(Math.random() * eligible.length)];
-    setDrawnRestaurant(pick);
+  const drawRestaurantHandler = () => {
+    if (isWheelSpinning) return;
+
+    if (eligibleRestaurants.length === 0) {
+      alert("No restaurants available to draw. Add more, adjust filters, or check cooldowns!");
+      return;
+    }
+
+    setDrawnRestaurant(null);
+    setIsWheelSpinning(true);
+    setTriggerWheelSpin(true);
   };
 
-  const acceptRestaurant = async () => {
+  const handleSpinComplete = (selectedRestaurant: Restaurant) => {
+    setDrawnRestaurant(selectedRestaurant);
+    setIsWheelSpinning(false);
+    setTriggerWheelSpin(false);
+  };
+
+  const acceptRestaurantHandler = async () => {
     if (!drawnRestaurant) return;
     const today = getFormattedNow();
     await applyRestaurantUpdate(drawnRestaurant.id, {
       lastChosen: today,
       drawHistory: [...(drawnRestaurant.drawHistory || []), today],
     });
-    setDrawHistory((prev) => [
+    setDrawHistoryState((prev) => [
       { name: drawnRestaurant.name, timestamp: today },
       ...prev,
     ]);
-    setDrawnRestaurant(null);
+    setDrawnRestaurant(null); // Clear after accepting
   };
 
-  const markAsRecentlyChosen = async () => {
+  const markAsRecentlyChosenHandler = async () => {
     if (!drawnRestaurant) return;
     const today = getFormattedNow();
     await applyRestaurantUpdate(drawnRestaurant.id, { lastChosen: today });
-    setDrawHistory((prev) => [
+    setDrawHistoryState((prev) => [
       { name: drawnRestaurant.name, timestamp: today },
       ...prev,
     ]);
-    drawRestaurant();
-  };
-
-  const disableRestaurant = async () => {
-    if (!drawnRestaurant) return;
-    await applyRestaurantUpdate(drawnRestaurant.id, { disabled: true });
+    // Instead of drawing again immediately, clear the drawn restaurant
+    // The user can then choose to spin again if they wish.
     setDrawnRestaurant(null);
   };
 
+  const disableDrawnRestaurantHandler = async () => {
+    if (!drawnRestaurant) return;
+    await applyRestaurantUpdate(drawnRestaurant.id, { disabled: true });
+    setDrawnRestaurant(null); // Clear after disabling
+  };
+
   const handleDeleteRestaurant = async (id: string) => {
-    if (window.confirm(`Delete "${id}"?`)) {
+    if (window.confirm(`Delete restaurant? This action cannot be undone.`)) {
       await deleteRestaurant(id);
       setRestaurants(await getRestaurants());
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("mealdraw_token");
+    localStorage.removeItem("mealdraw_user");
+    setLoggedIn(false);
+  };
+
+  const handleDeleteTab = (tabToDelete: string) => {
+    setTabsState((prev) => {
+      const updated = prev.filter((t) => t !== tabToDelete);
+      localStorage.setItem("mealdraw_tabs", JSON.stringify(updated));
+      return updated;
+    });
+    setRestaurants((prev) => prev.filter((r) => r.tab !== tabToDelete));
+    if (tabToDelete === currentTab) setCurrentTab(DEFAULT_TAB);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center bg-gray-50 px-4 pb-20">
-      <header className="w-full max-w-3xl flex justify-between items-center py-4">
-        <h1 className="text-2xl font-bold">Welcome, {username}</h1>
-        <div className="flex items-center gap-2">
+      <Header
+        username={username}
+        onLogout={handleLogout}
+        onShowAddRestaurantModal={() => setShowAddRestaurantModal(true)}
+      />
+
+      <main className="w-full max-w-3xl space-y-6"> {/* Increased space-y for better separation */}
+        <Tabs
+          tabs={tabsState}
+          currentTab={currentTab}
+          DEFAULT_TAB={DEFAULT_TAB}
+          onSetCurrentTab={setCurrentTab}
+          onDeleteTab={handleDeleteTab}
+          onShowAddTabModal={() => setShowAddTabModal(true)}
+        />
+
+        {/* Wheel and Draw Button Section */}
+        <div className="flex flex-col items-center gap-6">
+          <RestaurantWheel
+            restaurants={eligibleRestaurants}
+            onSpinComplete={handleSpinComplete}
+            isSpinning={isWheelSpinning}
+            triggerSpin={triggerWheelSpin}
+          />
           <button
-            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
-            onClick={() => {
-              localStorage.removeItem("mealdraw_token");
-              localStorage.removeItem("mealdraw_user");
-              setLoggedIn(false);
-            }}
+            className={`w-full sm:w-auto px-6 py-3 text-lg font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${
+              isWheelSpinning || eligibleRestaurants.length === 0
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700 text-white"
+            }`}
+            onClick={drawRestaurantHandler}
+            disabled={isWheelSpinning || eligibleRestaurants.length === 0}
           >
-            Logout
-          </button>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={() => setShowModal(true)}
-          >
-            + Add Restaurant
+            {isWheelSpinning ? "Spinning..." : "Spin the Wheel!"}
           </button>
         </div>
-      </header>
 
-      <main className="w-full max-w-3xl space-y-4">
-        <div className="flex flex-wrap gap-2 mb-4">
-          {tabs.map((tab) => (
-            <div key={tab} className="flex items-center gap-1">
+        {/* Draw Result Section - only shown when a restaurant is drawn and not spinning */}
+        {!isWheelSpinning && drawnRestaurant && (
+          <DrawResult
+            drawnRestaurant={drawnRestaurant}
+            onAccept={acceptRestaurantHandler}
+            onDrawAgain={drawRestaurantHandler} // Allows re-spin from results
+            onMarkAsRecentlyChosen={markAsRecentlyChosenHandler}
+            onDisable={disableDrawnRestaurantHandler}
+          />
+        )}
+
+        {/* Search and Filters Section */}
+        <div className="space-y-4 pt-4">
+          <input
+            type="text"
+            placeholder="Search restaurants..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full border p-2 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm font-medium text-gray-700">Filter by tags:</span>
+            {Array.from(
+              new Set(
+                restaurants
+                  .filter((r) => (r.tab || DEFAULT_TAB) === currentTab)
+                  .flatMap((r) => r.tags || [])
+              )
+            ).map((tag) => (
               <button
-                onClick={() => setCurrentTab(tab)}
-                className={`px-3 py-1 rounded-full text-sm border ${tab === currentTab
-                  ? "bg-blue-600 text-white border-blue-700"
-                  : "bg-white border-gray-300"
-                  }`}
+                key={tag}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  activeTags.includes(tag)
+                    ? "bg-blue-600 text-white border-blue-700"
+                    : "bg-white hover:bg-gray-100 border-gray-300 text-gray-700"
+                }`}
+                onClick={() => setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
               >
-                {tab}
+                #{tag}
               </button>
-
-              {tab !== DEFAULT_TAB && (
-                <button
-                  onClick={() => {
-                    if (!window.confirm(`Delete tab "${tab}"?`)) return;
-
-                    // Remove the tab
-                    setTabs((prev) => {
-                      const updated = prev.filter((t) => t !== tab);
-                      localStorage.setItem("mealdraw_tabs", JSON.stringify(updated));
-                      return updated;
-                    });
-
-                    // Remove restaurants in this tab
-                    setRestaurants((prev) => prev.filter((r) => r.tab !== tab));
-
-                    // Switch to default tab if you're deleting the current one
-                    if (tab === currentTab) setCurrentTab(DEFAULT_TAB);
-                  }}
-                  className="text-xs text-red-500 hover:text-red-700"
-                  title={`Delete ${tab}`}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-
-          <button
-            onClick={() => setShowAddTabModal(true)}
-            className="px-3 py-1 rounded-full border bg-green-500 text-white text-sm"
-          >
-            + Add Tab
-          </button>
+            ))}
+            {activeTags.length > 0 && (
+              <button
+                onClick={() => setActiveTags([])}
+                className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full text-xs font-medium transition-colors"
+              >
+                Clear Tags
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <button
-            className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            onClick={drawRestaurant}
-          >
-            Draw Restaurant
-          </button>
 
-          <div className="flex gap-2">
+        {/* Import/Export Buttons */}
+        <div className="flex justify-end gap-2 pt-4">
             <button
-              className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium shadow-sm"
               onClick={handleExport}
             >
               Export JSON
             </button>
-            <label className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer">
+            <label className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer text-sm font-medium shadow-sm">
               Import JSON
               <input
                 type="file"
@@ -345,234 +401,32 @@ function App() {
               />
             </label>
           </div>
-        </div>
 
-        <input
-          type="text"
-          placeholder="Search restaurants..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full border p-2 rounded"
+        <RestaurantList
+          restaurants={filteredRestaurantsForList}
+          isChosenToday={isChosenToday}
+          getRecencyColor={getRecencyColor}
+          getRelativeTime={getRelativeTime}
+          onEditRestaurant={setEditingRestaurant}
+          onToggleRestaurantDisable={(id, disabled) => applyRestaurantUpdate(id, { disabled })}
+          onDeleteRestaurant={handleDeleteRestaurant}
+          onReactivateRestaurant={reactivateRestaurantHandler}
         />
 
-        {drawnRestaurant && (
-          <div className="p-4 bg-white shadow rounded text-center space-y-2">
-            <h2 className="text-lg font-bold">Today's Pick: {drawnRestaurant.name}</h2>
-            {drawnRestaurant.locationLink && (
-              <a
-                href={drawnRestaurant.locationLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                View Location
-              </a>
-            )}
-            <div className="flex justify-center gap-2">
-              <button onClick={acceptRestaurant} className="px-3 py-1 bg-green-600 text-white rounded">Accept</button>
-              <button onClick={drawRestaurant} className="px-3 py-1 bg-yellow-500 text-white rounded">Draw Again</button>
-              <button onClick={markAsRecentlyChosen} className="px-3 py-1 bg-blue-600 text-white rounded">Mark Chosen</button>
-              <button onClick={disableRestaurant} className="px-3 py-1 bg-red-600 text-white rounded">Disable</button>
-            </div>
-          </div>
-        )}
+        <DrawHistory history={drawHistoryState} />
 
-        <div className="flex flex-wrap gap-2">
-          {Array.from(
-            new Set(
-              restaurants
-                .filter((r) => (r.tab || DEFAULT_TAB) === currentTab)
-                .flatMap((r) => r.tags || [])
-            )
-          ).map((tag) => (
-            <button
-              key={tag}
-              className={`px-2 py-1 rounded border ${activeTags.includes(tag) ? "bg-blue-600 text-white border-blue-700" : "bg-white border-gray-300"}`}
-              onClick={() => setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
-            >
-              #{tag}
-            </button>
-          ))}
-          {activeTags.length > 0 && (
-            <button onClick={() => setActiveTags([])} className="px-2 py-1 bg-gray-300 rounded">Clear Tags</button>
-          )}
-        </div>
+        <AddRestaurantModal
+          showModal={showAddRestaurantModal}
+          onClose={() => setShowAddRestaurantModal(false)}
+          onSubmit={handleAddRestaurantSubmit}
+        />
 
-        <ul className="space-y-2">
-          {filteredRestaurants.map((r) => (
-            <li
-              key={r.id}
-              onClick={() => setEditingRestaurant(r)}
-              className={`p-3 shadow rounded cursor-pointer transition hover:bg-blue-50 ${r.disabled ? "bg-gray-200 opacity-60" : "bg-white"}`}
-            >
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2 font-semibold text-base truncate max-w-[60%]">
-                  <span>{r.name}</span>
-                  {isChosenToday(r) && (
-                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-300">
-                      Chosen Today
-                    </span>
-                  )}
-                </div>
-                {(() => {
-                  const history = r.drawHistory;
-                  if (!history || history.length === 0) return null;
-
-                  const latest = history[history.length - 1];
-                  return (
-                    <div className={`text-xs mt-1 ${getRecencyColor(latest)}`}>
-                      Last chosen: {getRelativeTime(latest)}
-                    </div>
-                  );
-                })()}
-                {r.lastChosen && (() => {
-                  const today = new Date();
-                  const last = new Date(r.lastChosen);
-                  const diff = Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-                  return diff < (r.cooldownDays || 0);
-                })() && (
-                    <button
-                      onClick={withStop(() => reactivateRestaurant(r.id))}
-                      className="text-sm px-2 py-1 rounded bg-pink-500 text-white"
-                    >
-                      Reactivate
-                    </button>
-                  )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={withStop(() => applyRestaurantUpdate(r.id, { disabled: !r.disabled }))}
-                    className={`text-sm px-2 py-1 rounded ${r.disabled ? "bg-green-500" : "bg-red-500"} text-white`}
-                  >
-                    {r.disabled ? "Enable" : "Disable"}
-                  </button>
-                  <button
-                    onClick={withStop(() => handleDeleteRestaurant(r.id))}
-                    className="text-sm px-2 py-1 rounded bg-gray-600 text-white"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              {r.tags && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {r.tags.map((tag, i) => (
-                    <span key={i} className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-
-        {drawHistory.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-lg font-bold mb-2">Draw History</h2>
-            <ul className="space-y-1 text-sm text-gray-700">
-              {drawHistory.map((entry, i) => (
-                <li key={i} className="bg-white p-2 rounded shadow-sm flex justify-between">
-                  <span>{entry.name}</span>
-                  <span className="text-xs text-gray-500">{entry.timestamp}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Add Restaurant</h2>
-              <form onSubmit={handleAddRestaurant} className="space-y-4">
-                <input name="name" type="text" placeholder="Name" className="w-full border p-2 rounded" required />
-                <input name="cooldown" type="number" placeholder="Cooldown Days" className="w-full border p-2 rounded" />
-                <input name="locationLink" type="url" placeholder="Location Link (optional)" className="w-full border p-2 rounded" />
-                <input name="tags" type="text" placeholder="Tags (comma separated)" className="w-full border p-2 rounded" />
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Add</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {editingRestaurant && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">Edit: {editingRestaurant.name}</h2>
-              <form
-                onSubmit={(e) => handleEditSubmit(e, editingRestaurant.id)}
-                className="space-y-4"
-              >
-                <input
-                  name="name"
-                  type="text"
-                  defaultValue={editingRestaurant.name}
-                  className="w-full border p-2 rounded"
-                />
-                <input
-                  name="cooldown"
-                  type="number"
-                  placeholder="Cooldown Days"
-                  defaultValue={editingRestaurant.cooldownDays}
-                  className="w-full border p-2 rounded"
-                />
-                <input
-                  name="locationLink"
-                  type="url"
-                  placeholder="Location Link (optional)"
-                  defaultValue={editingRestaurant.locationLink || ""}
-                  className="w-full border p-2 rounded"
-                />
-                <input
-                  name="tags"
-                  type="text"
-                  placeholder="Tags (comma separated)"
-                  defaultValue={(editingRestaurant.tags || []).join(", ")}
-                  className="w-full border p-2 rounded"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingRestaurant(null)}
-                    className="px-4 py-2 bg-gray-300 rounded"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-              {(() => {
-                const history = editingRestaurant.drawHistory;
-                if (!history || history.length === 0) return null;
-
-                const latest = history[history.length - 1];
-                return (
-                  <div className="mt-4 max-h-40 overflow-y-auto border-t pt-2 text-sm text-gray-700">
-                    <h3 className="font-semibold mb-1">Draw History</h3>
-                    <ul className="space-y-1">
-                      {history
-                        .slice()
-                        .reverse()
-                        .map((date, idx) => (
-                          <li key={idx}>{getRelativeTime(date)} ({date})</li>
-                        ))}
-                    </ul>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )
-        }
-
+        <EditRestaurantModal
+          editingRestaurant={editingRestaurant}
+          onClose={() => setEditingRestaurant(null)}
+          onSubmit={handleEditRestaurantSubmit}
+          getRelativeTime={getRelativeTime}
+        />
 
       </main>
       {showAddTabModal && (
@@ -584,9 +438,9 @@ function App() {
                 e.preventDefault();
                 const name = newTabName.trim();
                 if (!name) return alert("Tab name is required.");
-                if (tabs.includes(name)) return alert("Tab already exists.");
-                const updated = [...tabs, name];
-                setTabs(updated);
+                if (tabsState.includes(name)) return alert("Tab already exists.");
+                const updated = [...tabsState, name];
+                setTabsState(updated);
                 localStorage.setItem("mealdraw_tabs", JSON.stringify(updated));
                 setCurrentTab(name);
                 setNewTabName("");
@@ -599,7 +453,7 @@ function App() {
                 value={newTabName}
                 onChange={(e) => setNewTabName(e.target.value)}
                 placeholder="e.g. Work, Family, Travel"
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 autoFocus
               />
               <div className="flex justify-end gap-2">
@@ -609,13 +463,13 @@ function App() {
                     setNewTabName("");
                     setShowAddTabModal(false);
                   }}
-                  className="px-4 py-2 bg-gray-300 rounded"
+                  className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium"
                 >
                   Add Tab
                 </button>
